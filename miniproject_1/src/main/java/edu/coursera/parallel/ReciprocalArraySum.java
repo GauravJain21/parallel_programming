@@ -1,5 +1,6 @@
 package edu.coursera.parallel;
 
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 
 /**
@@ -101,6 +102,8 @@ public final class ReciprocalArraySum {
          */
         private double value;
 
+        private final int THRESHOLD = 100;
+
         /**
          * Constructor.
          * @param setStartIndexInclusive Set the starting index to begin
@@ -125,7 +128,22 @@ public final class ReciprocalArraySum {
 
         @Override
         protected void compute() {
-            // TODO
+            // Put this value from the invoking function to better use the cores.
+            // System.setProperty("java.util.concurrent.ForkJoinPool.common.parallelism", "6");
+            // My system has 6 cores therefore the above line.
+            if (endIndexExclusive - startIndexInclusive < THRESHOLD) {
+                for (int i = startIndexInclusive; i <= endIndexExclusive; i++) {
+                    value += 1/input[i];
+                }
+            } else {
+                int mid = (startIndexInclusive + endIndexExclusive)>>1;
+                ReciprocalArraySumTask leftTask = new ReciprocalArraySumTask(startIndexInclusive, mid, input);
+                ReciprocalArraySumTask rightTask = new ReciprocalArraySumTask(mid + 1, endIndexExclusive, input);
+                leftTask.fork();
+                rightTask.compute();
+                leftTask.join();
+                value = leftTask.value + rightTask.value;
+            }
         }
     }
 
@@ -140,15 +158,12 @@ public final class ReciprocalArraySum {
      */
     protected static double parArraySum(final double[] input) {
         assert input.length % 2 == 0;
+        System.setProperty("java.util.concurrent.ForkJoinPool.common.parallelism", "6");
+        ForkJoinPool pool = new ForkJoinPool();
+        ReciprocalArraySumTask task = new ReciprocalArraySumTask(0, input.length - 1, input);
+        pool.invoke(task);
+        return task.value;
 
-        double sum = 0;
-
-        // Compute sum of reciprocals of array elements
-        for (int i = 0; i < input.length; i++) {
-            sum += 1 / input[i];
-        }
-
-        return sum;
     }
 
     /**
